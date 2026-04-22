@@ -14,5 +14,8 @@ AREA!"
 This is a Junior-year computer programming project to make a smart doorbell with machine learning, hopefully, to not only identify faces, but recognize specific ones,
  
  
-In this project, the following were used:
+In this project, the following hardware components were used:
     LePotato
+    8 Ohm 1 Watt speaker
+    MAX98306 Stereo Amplifier module
+    4-Pin Pushbutton
