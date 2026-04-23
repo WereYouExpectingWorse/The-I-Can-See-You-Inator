@@ -2,84 +2,62 @@ import gpiod
 import time
 
 CHIP = '1'
-BUTTON_PIN = 85
-SPEAKER_PIN = 87
+BUTTON_PIN = 85  # Physical Pin 33
+SPEAKER_PIN = 87 # Physical Pin 19
 
-# Morse Timing
-DOT_MAX = 0.25
-WORD_GAP = 1.2  # Time to wait before "submitting" the code
-
-MORSE_DICT = {
-    '.-': 'A', '-...': 'B', '-.-.': 'C', '-..': 'D', '.': 'E', 
-    '..-.': 'F', '--.': 'G', '....': 'H', '..': 'I', '.---': 'J', 
-    '-.-': 'K', '.-..': 'L', '--': 'M', '-.': 'N', '---': 'O', 
-    '.--.': 'P', '--.-': 'Q', '.-.': 'R', '...': 'S', '-': 'T', 
-    '..-': 'U', '...-': 'V', '.--': 'W', '-..-': 'X', '-.--': 'Y', '--..': 'Z'
-}
-
-def play_tone(line, freqs, durations):
-    for f, d in zip(freqs, durations):
-        if f == 0:
-            time.sleep(d)
-            continue
-        delay = 1.0 / (f * 2)
-        cycles = int(d * f)
-        for _ in range(cycles):
-            line.set_value(1)
-            time.sleep(delay)
-            line.set_value(0)
-            time.sleep(delay)
-
-def FirstEE(spk):
-    print("♪ Easter Egg! ♪")
-    notes = [349, 392, 415, 440, 0, 349, 392, 415, 349]
-    lengths = [0.1, 0.1, 0.1, 0.2, 0.05, 0.1, 0.1, 0.1, 0.4]
-    play_tone(spk, notes, lengths)
+def play_tone(line, frequency, duration):
+    """Generates a square wave tone on the specified line."""
+    if frequency == 0:
+        time.sleep(duration)
+        return
+    
+    # Calculate delay (half the period of the frequency)
+    delay = 1.0 / (frequency * 2)
+    cycles = int(duration * frequency)
+    
+    for _ in range(cycles):
+        line.set_value(1)
+        time.sleep(delay)
+        line.set_value(0)
+        time.sleep(delay)
 
 def main():
     chip = gpiod.Chip(CHIP)
-    btn = chip.get_line(BUTTON_PIN); btn.request("Btn", gpiod.LINE_REQ_DIR_IN, gpiod.LINE_REQ_FLAG_BIAS_PULL_UP)
-    spk = chip.get_line(SPEAKER_PIN); spk.request("Spk", gpiod.LINE_REQ_DIR_OUT)
+    
+    # Setup Button (Input)
+    button = chip.get_line(BUTTON_PIN)
+    button.request(consumer="Button", type=gpiod.LINE_REQ_DIR_IN, 
+                   flags=gpiod.LINE_REQ_FLAG_BIAS_PULL_UP)
+    
+    # Setup Speaker (Output)
+    speaker = chip.get_line(SPEAKER_PIN)
+    speaker.request(consumer="Speaker", type=gpiod.LINE_REQ_DIR_OUT)
 
-    current_letter = ""
-    decoded_message = ""
-    last_release = time.time()
-
-    print("Doorbell Live. Tap GAB for the secret theme.")
+    print("Doorbell Active! (Pin 33 -> Button, Pin 19 -> Speaker)")
 
     try:
         while True:
-            # 1. Capture Taps
-            if btn.get_value() == 0:
-                start = time.time()
-                while btn.get_value() == 0: time.sleep(0.01)
-                duration = time.time() - start
-                current_letter += "." if duration < DOT_MAX else "-"
-                last_release = time.time()
-
-            # 2. Check for Letter/Word completion
-            if current_letter != "" and (time.time() - last_release) > 0.5:
-                # Character finished, look it up
-                char = MORSE_DICT.get(current_letter, "?")
-                decoded_message += char
-                print(f"Decoded: {decoded_message} (Code: {current_letter})")
-                current_letter = "" # Reset for next letter
-
-            # 3. Check Word vs Secret Key
-            if decoded_message != "" and (time.time() - last_release) > WORD_GAP:
-                if "GAB" in decoded_message:
-                    FirstEE(spk)
-                else:
-                    print("Standard Doorbell")
-                    play_tone(spk, [660, 523], [0.4, 0.6])
+            # Button is 0 (GND) when pressed
+            if button.get_value() == 0:
+                print("Ding Dong!")
                 
-                decoded_message = "" # Clear for next guest
-
-            time.sleep(0.05)
+                # The 'Ding' (Higher pitch)
+                play_tone(speaker, 660, 0.4) 
+                # The 'Dong' (Lower pitch)
+                play_tone(speaker, 523, 0.6) 
+                
+                # Wait for release to prevent infinite ringing
+                while button.get_value() == 0:
+                    time.sleep(0.1)
+            
+            time.sleep(0.05) # Power saving delay
+            
     except KeyboardInterrupt:
-        pass
+        print("\nStopping...")
     finally:
-        btn.release(); spk.release()
+        speaker.set_value(0) # Ensure speaker is off
+        button.release()
+        speaker.release()
 
 if __name__ == "__main__":
     main()
