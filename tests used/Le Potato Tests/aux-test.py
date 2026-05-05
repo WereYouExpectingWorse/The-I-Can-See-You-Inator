@@ -5,7 +5,7 @@ def play_live_tone(frequency, duration):
     fs = 44100  # Sample rate
     t = np.linspace(0, duration, int(fs * duration), False)
     
-    # Generate a square wave (just like the GPIO toggling)
+    # Generate a square wave
     tone = 0.5 * np.sign(np.sin(2 * np.pi * frequency * t))
     
     # Send it directly to the sound card
